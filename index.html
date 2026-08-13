@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>清華簡《筮法》查驗器 v0.1</title>
+<title>清華簡《筮法》查驗器 v0.4</title>
 <style>
 :root{
   --pith:#E3DDC6;      /* 竹黃 */
@@ -79,6 +79,14 @@ button.act.ghost{background:transparent;color:var(--ink);border:1px solid var(--
 .hit b{letter-spacing:.08em}
 .hit .why{display:block;font-size:.78rem;color:var(--ink-2)}
 
+.bg{display:grid;grid-template-columns:repeat(9,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);font-size:.74rem}
+.bg div{background:var(--pale);padding:4px 2px;text-align:center;min-height:2.6em}
+.bg div.hd{background:var(--pith-2);letter-spacing:.04em}
+.bg div.q{cursor:pointer}
+.bg div.q:hover,.bg div.q:focus{background:var(--pith-2);outline:none}
+.bg div.miss{background:#F7E9E6}
+.bg b{display:block;font-size:.86rem}
+.bg small{font-size:.62rem;color:var(--ink-2)}
 /* ── 出處／狀態標記 ── */
 .tag{font-size:.66rem;letter-spacing:.08em;padding:1px 5px;border:1px solid;border-radius:2px;white-space:nowrap;margin-left:5px;vertical-align:.12em}
 .t-src{color:var(--qing);border-color:var(--qing)}
@@ -113,11 +121,12 @@ summary{cursor:pointer;font-size:.88rem;letter-spacing:.06em}
 <body>
 <div class="wrap">
 <h1>清華簡《筮法》查驗器</h1>
-<div class="sub">v0.1　戰國非《周易》占筮系統　四位・十七命・卦位圖　—　只查驗，不起卦</div>
+<div class="sub">v0.4　戰國非《周易》占筮系統　四位・十七命・卦位圖　—　只查驗，不起卦</div>
 
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-t="t1">查驗</button>
   <button role="tab" aria-selected="false" data-t="t2">卦例</button>
+  <button role="tab" aria-selected="false" data-t="t7">別卦</button>
   <button role="tab" aria-selected="false" data-t="t3">查表</button>
   <button role="tab" aria-selected="false" data-t="t4">成卦</button>
   <button role="tab" aria-selected="false" data-t="t5">文獻</button>
@@ -145,17 +154,21 @@ summary{cursor:pointer;font-size:.88rem;letter-spacing:.06em}
 <!-- ═══ 卦例 ═══ -->
 <section id="t2" hidden>
   <h2>五十七卦例</h2>
-  <p><small>筮辭與節次已備，<b>十二筮數尚缺</b>——原書卦畫為圖，未取得逐例數字。空殼已建，數字欄留空；補入後即可回驗規則層。</small></p>
+  <p><small>五十七例之<b>四位卦名已全數錄入</b>（錄自劉佳佩集釋）。十二筮數僅二例可得——原書卦畫為圖，餘者未取得。<br>故「卦身類」「位置類」判準已可全面回驗，「爻位類」判準仍受限。</small></p>
   <div class="card">
     <h3 style="margin-top:0">反查</h3>
     <div class="row">
       <label>判準 <select class="big" id="rq"></select></label>
       <button class="act" id="rqrun">列出符合之卦例</button>
     </div>
-    <div id="rqout"><small>接口已備，待筮數填入後生效。</small></div>
+    <div id="rqout"><small>選一條判準，列出五十七卦例中成立者。</small></div>
   </div>
+  <div id="bkout"></div>
   <div id="lieout"></div>
 </section>
+
+<!-- ═══ 別卦 ═══ -->
+<section id="t7" hidden><div id="bieout"></div></section>
 
 <!-- ═══ 查表 ═══ -->
 <section id="t3" hidden><div id="tblout"></div></section>
@@ -574,45 +587,234 @@ function paintChengua(){
 }
 
 /* ── 五十七卦例空殼 ── */
-const JIE=[
- [1,"死生",9],[2,"得",11],[3,"享",2],[4,"變",2],[5,"至",2],[6,"娶妻",2],[7,"讎",2],
- [8,"見",3],[9,"咎",1],[10,"瘳",1],[11,"雨旱",2],[12,"男女",1],[13,"行",1],
- [14,"貞丈夫女子",8],[15,"小得",4],[16,"戰（征）",2],[17,"成",2],[18,"志事",0],[19,"志事、軍旅",2]
+const LIEDATA=[
+{j:1,g:["巽","乾","羅","乾"],ci:"六 （虛），亓（其）（病）哭死。",s:0},
+{j:1,g:["羅","艮","震","乾"],ci:"五 （虛）同弌（一） （虛），死。",s:0},
+{j:1,g:["勞","震","兌","勞"],ci:"參（三）吉同兇， （待）死。",s:0},
+{j:1,g:["羅","兌","震","兌"],ci:"參（三）兇同吉， （待）死。",s:0},
+{j:1,g:["勞","震","兌","勞"],ci:"兇，亞（惡）肴（爻）凥（處）之，今 （焉）死。",s:0},
+{j:1,g:["羅","兌","巽","兌"],ci:"參（三）兇同吉，亞（惡）肴（爻）",s:0},
+{j:1,g:["巽","震","羅","坤"],ci:"（筮）死妻者，相見",s:0},
+{j:1,g:["乾","艮","艮","坤"],ci:"（筮）疾者，弌（一）刲（卦）亢",s:0},
+{j:1,g:["羅","勞","兌","震"],ci:"（筮）死夫者，相見",s:0},
+{j:2,g:["坤","乾","巽","坤"],ci:"妻夫同人，乃得。",s:0},
+{j:2,g:["巽","羅","坤","艮"],ci:"參（三） （左）同右，乃 （得）。",s:0},
+{j:2,g:["兌","坤","羅","兌"],ci:"參（三）右同（左）， （得）。",s:0},
+{j:2,g:["震","勞","巽","震"],ci:"參（三）男同女，乃 （得）。",s:0},
+{j:2,g:["兌","坤","乾","羅"],ci:"參（三）女同男，乃 （得）。",s:0},
+{j:2,g:["兌","震","巽","勞"],ci:"見丁 （數），乃亦 （得）。",s:0},
+{j:2,g:["坤","兌","兌","乾"],ci:"（作）於陽，內（入）於侌（陰），",s:0},
+{j:2,g:["巽","乾","兌","坤"],ci:"（春）見八，乃亦 （得）。",s:0},
+{j:2,g:["兌","震","羅","巽"],ci:"（夏）見五，乃亦 （得）。",s:0},
+{j:2,g:["兌","勞","巽","羅"],ci:"（秋）見九，乃亦 （得）。",s:0},
+{j:2,g:["羅","艮","巽","兌"],ci:"（冬）見四，乃亦 （得）。",s:0},
+{j:3,g:["坤","坤","巽","坤"],ci:"（凡）亯（享），月朝屯（純）牝，乃鄉（饗）。",s:0},
+{j:3,g:["乾","乾","艮","乾"],ci:"月夕屯（純）戊（牡），乃亦鄉（饗）。",s:0},
+{j:4,g:["坤","兌","坤","乾"],ci:"（凡） ， （數）而出，乃述（遂）。",s:0},
+{j:4,g:["乾","艮","兌","坤"],ci:"（凡） ， （數）而內（入），乃 （復）。",s:0},
+{j:5,g:["勞","震","兌","羅"],ci:"至，四正之刲（卦）見，乃至。",s:0},
+{j:5,g:["乾","艮","坤","巽"],ci:"亓（其）余（餘）， （易）向，乃亦至。 （當）",s:0},
+{j:6,g:["羅","坤","兌","艮"],ci:"（凡）取（娶）妻，參（三）女同男，吉。",s:0},
+{j:6,g:["勞","艮","巽","乾"],ci:"（凡）取（娶）妻，參（三）男同女，兇。",s:0},
+{j:7,g:["兌","艮","震","乾"],ci:"（凡）讎（售），參（三）男同女〓（女，女）才（在） （(cid:290)(cid:",s:0},
+{j:7,g:["羅","艮","艮","乾"],ci:"（少）肴（淆），讎（售）。 （數）出，乃亦讎（售）。",s:0},
+{j:8,g:["巽","坤","勞","巽"],ci:"（凡）見，參（三）女同男〓（男，男）見。",s:0},
+{j:8,g:["艮","震","羅","乾"],ci:"（凡）見，參（三）男同女〓（女，女）見。",s:0},
+{j:8,g:["羅","艮","坤","乾"],ci:"（凡）見大人，佋（昭）穆，見。",s:0},
+{j:9,g:["羅","巽","坤","乾"],ci:"見述日，妻夫、昭穆、上毀，亡咎",s:1},
+{j:10,g:["巽","兌","乾","艮"],ci:"（凡）瘳，見述（術）日 上毁，瘳。",s:0},
+{j:11,g:["坤","兌","勞","艮"],ci:"（凡）雨， （當）日才（在）下， （數）而",s:0},
+{j:11,g:["巽","兌","勞","艮"],ci:"金木相見才（在）上，侌（陰）。水",s:0},
+{j:12,g:["巽","坤","羅","艮"],ci:"（凡）男，上去弍（二），下去弌（一），",s:0},
+{j:13,g:["坤","兌","艮","乾"],ci:"（凡）行， （數）出，述（遂）； （數）內（入）， （復）。",s:0},
+{j:14,g:["乾","乾","艮","乾"],ci:"（凡） （貞）丈夫，",s:0},
+{j:14,g:["乾","乾","坤","乾"],ci:"月夕（乾）之",s:0},
+{j:14,g:["震","乾","坤","乾"],ci:"卒（萃），乃屯（純）吉，",s:0},
+{j:14,g:["艮","乾","坤","乾"],ci:"亡 （春）（夏） （秋） （冬）。",s:0},
+{j:14,g:["坤","坤","巽","坤"],ci:"（凡） （貞）女子，",s:0},
+{j:14,g:["坤","坤","羅","坤"],ci:"月朝（坤）之",s:0},
+{j:14,g:["坤","坤","兌","坤"],ci:"卒（萃），乃吉，亡",s:0},
+{j:14,g:["坤","坤","艮","坤"],ci:"（春） （夏）（秋） （冬）。",s:0},
+{j:15,g:["羅","勞","兌","羅"],ci:"（凡）少（小） （得），乃 （得）之。",s:0},
+{j:15,g:["羅","勞","巽","羅"],ci:"（凡）少（小） （得），乃 （得）之。",s:0},
+{j:15,g:["震","震","勞","震"],ci:"參（三）同弌（一），乃 （得）之。",s:0},
+{j:15,g:["巽","震","坤","乾"],ci:"邦去政已，於公利貧（分）",s:1},
+{j:16,g:["勞","勞","羅","羅"],ci:"（凡）是，內（勝）外。",s:0},
+{j:16,g:["羅","羅","勞","勞"],ci:"（凡）是，外（勝）內。",s:0},
+{j:17,g:["巽","兌","羅","艮"],ci:"（凡）成，同，乃成。",s:0},
+{j:17,g:["震","勞","兌","羅"],ci:"不同，乃不成。",s:0},
+{j:19,g:["羅","坤","震","艮"],ci:"（凡） （筮）志事，而見同(cid:601)(cid:601)(cid:601)(",s:0},
+{j:19,g:["勞","乾","巽","兌"],ci:"奴（如） （筮）(cid:2723)(cid:2723)禾（和）， （且）不相用命。",s:0}
 ];
-const LIE=[];(function(){let id=1;JIE.forEach(([n,name,c])=>{for(let i=0;i<c;i++)LIE.push({id:id++,jie:n,name,yao:null,gua:null,ci:null});});})();
-/* 已填入之卦例。筮數出陳睿宏所錄（「一一一 一一一」「一六一 六一一」等），
-   六畫卦之數自下而上讀：前三為下位卦、後三為上位卦。卦名出劉佳佩集釋所附四位卦名。 */
-LIE[0].ci="六虛，亓病哭死";
+const JIENAME={1:"死生",2:"得",3:"享",4:"弁（更／變）",5:"至",6:"娶妻",7:"讎（仇／售）",8:"見",9:"咎",10:"瘳",11:"雨旱",12:"男女",13:"行",14:"貞丈夫女子",15:"小得",16:"戰（征）",17:"成",18:"志事",19:"志事、軍旅"};
+
+/* 五十七卦例。四位卦名錄自劉佳佩集釋（各卦例所附之卦名列）；二例之卦名不作並列排版，
+   係據集釋所引整理者與馬楠、子居案語推定，s:1 標之。筮數僅二例可得。 */
+const LIE=LIEDATA.map((x,i)=>({id:i+1,jie:x.j,name:JIENAME[x.j],ci:x.ci,
+  gua:{"左上":x.g[0],"右上":x.g[1],"左下":x.g[2],"右下":x.g[3]},tui:x.s===1,yao:null}));
 LIE[0].yao={"左下":[7,6,7],"左上":[6,7,7],"右下":[7,7,7],"右上":[7,7,7]};
-LIE[0].gua={"左上":"巽","右上":"乾","左下":"羅","右下":"乾"};
-LIE[1].ci="五虛同一虛，死";
 LIE[1].yao={"左下":[7,6,6],"左上":[7,6,7],"右下":[7,7,7],"右上":[6,6,7]};
-LIE[1].gua={"左上":"羅","右上":"艮","左下":"震","右下":"乾"};
 
 function paintLie(){
-  let h=`<table><tr><th>№</th><th>節</th><th class="l">節名・筮辭</th><th class="l">四位卦</th><th class="l">十二筮數</th></tr>`;
+  const nJ={},nT=LIE.filter(x=>x.tui).length,nY=LIE.filter(x=>x.yao).length;
+  LIE.forEach(x=>nJ[x.jie]=(nJ[x.jie]||0)+1);
+  let h=`<div class="card"><h3 style="margin-top:0">分節例數</h3><table><tr><th>節</th>`
+   +Object.keys(nJ).map(j=>`<th>${j}</th>`).join("")+`<th>計</th></tr><tr><th>例</th>`
+   +Object.values(nJ).map(v=>`<td class="mono">${v}</td>`).join("")+`<td class="mono"><b>${LIE.length}</b></td></tr></table>
+   <small>第十八節無卦例（純文字）。${nT} 例之卦名據案語推定（第九節〈咎〉、第十五節〈小得〉第四例——該二例之卦名未作並列排版）。
+   筮數僅 ${nY} 例可得。</small></div>`;
+  h+=`<table><tr><th>№</th><th>節</th><th class="l">四位卦（左上・右上・左下・右下）</th><th class="l">筮辭</th><th class="l">筮數</th></tr>`;
   LIE.forEach(x=>{
     let sh="",chk="";
-    if(x.yao){
-      sh=WEI.map(w=>x.yao[w].map(n=>NUMCH[n]).join("")).join(" ");
-      const ok=WEI.every(w=>guaOf(x.yao[w])===x.gua[w]);
-      chk=ok?'<span class="ok">卦名相符</span>':'<span class="bad">不符</span>';
-    }
-    h+=`<tr><td class="mono">${x.id}</td><td class="mono">${x.jie}</td><td class="l">${x.name}${x.ci?"<br><small>"+x.ci+"</small>":""}</td>
-    <td class="l mono">${x.gua?WEI.map(w=>x.gua[w]).join(""):'<span class="zhu">缺</span>'}</td>
-    <td class="l mono">${sh||'<span class="zhu">缺</span>'} ${chk}</td></tr>`;});
-  h+=`</table><p><small>共 ${LIE.length} 例。第十八節無卦例（純文字）。
-  各節卦例數依整理者分節與子居所錄筮辭條數編列，<b>總數與「五十七卦例」之說相符與否，須俟原書核對</b>。${T_CUN}</small></p>`;
+    if(x.yao){ sh=WEI.map(w=>x.yao[w].map(n=>NUMCH[n]).join("")).join(" ");
+      chk=WEI.every(w=>guaOf(x.yao[w])===x.gua[w])?'<span class="ok">合</span>':'<span class="bad">不合</span>';}
+    h+=`<tr><td class="mono">${x.id}</td><td class="mono">${x.jie}<br><small>${x.name}</small></td>
+     <td class="l">${WEI.map(w=>x.gua[w]).join("・")}${x.tui?T_BU:""}</td>
+     <td class="l"><small>${x.ci}</small></td>
+     <td class="l mono">${sh?sh+" "+chk:'<span class="zhu">缺</span>'}</td></tr>`;});
+  h+=`</table>`;
   document.getElementById("lieout").innerHTML=h;
-  const sel=document.getElementById("rq");
-  sel.innerHTML=RULES.map(r=>`<option>${r.id}</option>`).join("");
+  document.getElementById("rq").innerHTML=RULES.map(r=>`<option data-c="${r.cls}">${r.id}</option>`).join("");
 }
 document.getElementById("rqrun").onclick=()=>{
-  const has=LIE.filter(x=>x.yao);
-  document.getElementById("rqout").innerHTML=has.length
-    ? `<small>符合者：…（待實作）</small>`
-    : `<small class="zhu">五十七例之筮數皆未填入，反查無從執行。接口已備：填入 yao 欄後即可用。</small>`;
+  const id=document.getElementById("rq").value, r=RULES.find(x=>x.id===id);
+  if(!r){document.getElementById("rqout").innerHTML="";return;}
+  if(r.cls==="爻位"){
+    const av=LIE.filter(x=>x.yao);
+    const hit=av.filter(x=>r.fn(x.gua,x.yao).ok);
+    document.getElementById("rqout").innerHTML=
+     `<p><small><b class="zhu">爻位類判準須真筮數</b>，現僅 ${av.length} 例可測。</small></p>`
+     +(hit.length?hit.map(x=>`<div class="hit"><b>№${x.id}　第${x.jie}節 ${x.name}</b><span class="why">${WEI.map(w=>x.gua[w]).join("・")}　${x.ci}</span></div>`).join(""):`<small>可測範圍內無符合者。</small>`);
+    return;
+  }
+  const hit=LIE.filter(x=>r.fn(x.gua,x.yao||{"左上":[7,7,7],"右上":[7,7,7],"左下":[7,7,7],"右下":[7,7,7]}).ok);
+  document.getElementById("rqout").innerHTML=
+   `<p><small>「${id}」於五十七卦例中成立 <b>${hit.length}</b> 例。此類判準只需四位卦名，故全部可測。</small></p>`
+   +hit.map(x=>`<div class="hit"><b>№${x.id}　第${x.jie}節 ${x.name}</b><span class="why">${WEI.map(w=>x.gua[w]).join("・")}　${x.ci}${x.tui?"　"+T_BU:""}</span></div>`).join("");
 };
+
+/* ── 回驗：以筮辭自陳之判斷回查引擎所算 ── */
+function backCheck(){
+  const out=[];
+  LIE.forEach(x=>{
+    const g=x.gua, ts=[];
+    const has=(...k)=>k.some(t=>x.ci.indexOf(t)>=0);
+    if(has("女同男")) ts.push(["三女同男",WEI.filter(w=>GUA[g[w]].xing==="女").length===3]);
+    if(has("男同女")) ts.push(["三男同女",WEI.filter(w=>GUA[g[w]].xing==="男").length===3]);
+    if(has("左同右")) ts.push(["三左同右",WEI.filter(w=>LEFT.has(g[w])).length===3]);
+    if(has("右同左")) ts.push(["三右同左",WEI.filter(w=>RIGHT.has(g[w])).length===3]);
+    if(has("妻夫"))   ts.push(["妻夫相見",PAIR[g["左下"]]===g["右下"]||PAIR[g["左上"]]===g["右上"]]);
+    if(has("吉同兇")) {const s=["春","夏","秋","冬"].filter(s=>{const c=jiCount(g,s);return c.ji.length===3&&c.xiong.length===1;});
+      ts.push(["三吉同兇（"+(s.join("")||"無")+"）",s.length>0]);}
+    if(has("兇同吉")) {const s=["春","夏","秋","冬"].filter(s=>{const c=jiCount(g,s);return c.xiong.length===3&&c.ji.length===1;});
+      ts.push(["三兇同吉（"+(s.join("")||"無")+"）",s.length>0]);}
+    ts.forEach(t=>out.push({id:x.id,jie:x.jie,g:WEI.map(w=>g[w]).join(""),t:t[0],ok:t[1]}));
+  });
+  return out;
+}
+
+function paintBack(){
+  const r=backCheck(), ok=r.filter(x=>x.ok).length;
+  let h=`<div class="card" style="border-color:${ok===r.length?'var(--zhuqing)':'var(--zhu)'}">
+   <h3 style="margin-top:0">卦例回驗　<b class="${ok===r.length?'ok':'bad'}">${ok} / ${r.length} 合</b></h3>
+   <p><small>取筮辭中自陳判斷之語（三女同男・三左同右・妻夫・三吉同兇等），以引擎所算之四位卦名回查是否成立。
+   此為<b>規則層對原書卦例的檢核</b>：不合即表示引擎的判準或所錄卦名有誤。</small></p><table>
+   <tr><th>№</th><th>節</th><th class="mono">四位卦</th><th class="l">筮辭所陳</th><th>引擎</th></tr>`;
+  r.forEach(x=>h+=`<tr><td class="mono">${x.id}</td><td class="mono">${x.jie}</td><td class="mono">${x.g}</td>
+   <td class="l">${x.t}</td><td class="${x.ok?"ok":"bad"}">${x.ok?"合":"不合"}</td></tr>`);
+  h+=`</table><small>四季吉凶類之括號內為成立之季節——筮辭未言季節，此為引擎反推所得，非原書所有。
+  其餘四十餘例之筮辭未自陳可機檢之判斷（多為占辭而非判準），故未列。</small></div>`;
+  document.getElementById("bkout").innerHTML=h;
+}
+
+/* ════════ 別卦（清華簡肆，與《筮法》同輯） ════════
+   經卦依上卦分八組，序：倝(乾)・艮・勞(坎)・徠(震)；坤・兌・羅(離)・巽
+   組內下卦序：乾坤・艮兌・勞羅・徠巽，惟經卦本身移至經首
+   勞經一支缺簡，其八卦名不存 */
+const BIE_UP=["乾","艮","勞","震","坤","兌","羅","巽"];
+const BIE_DOWN=["乾","坤","艮","兌","勞","羅","震","巽"];
+const BIE={ // 上卦: { 下卦: [簡名, 通行名, 異文] }
+ "乾":{"乾":["倝","乾","《象傳》作健，帛書作鍵"],"坤":["啚","否","啚通鄙；帛書作婦"],
+   "艮":["敓","遯","敓為奪之古字；帛書作掾，阜陽簡作椽"],"兌":["履","履","帛書作禮"],
+   "勞":["訟","訟",""],"羅":["同人","同人",""],
+   "震":["亡孟","无妄","帛書作无孟；上博簡作亡忘"],"巽":["繫","姤","帛書作狗，上博簡作敂"]},
+ "艮":{"艮":["艮","艮","帛書作根，《歸藏》作很"],"乾":["大䈞","大畜","䈞為篤之古字；帛書作泰蓄，歸藏作大毒畜"],
+   "坤":["僕","剝","歸藏亦作僕，帛書與秦簡作剝"],"兌":["損","損",""],
+   "勞":["蒙","蒙","上博簡作尨"],"羅":["賁","賁","帛書作蘩"],
+   "震":["頤","頤",""],"巽":["蠱","蠱","歸藏作夜，帛書作箇"]},
+ "勞":{"勞":["","坎","帛書作贛，歸藏作犖，秦簡作勞"],"乾":["","需",""],"坤":["","比",""],
+   "艮":["","蹇",""],"兌":["","節",""],"羅":["","既濟","若未濟作「淒」，既濟或作「濟／霽」——推測"],
+   "震":["","屯",""],"巽":["","井",""]},
+ "震":{"震":["徠","震","另作震形加口／日；帛書作辰，歸藏作釐"],"乾":["大壯","大壯",""],
+   "坤":["介","豫","帛書作餘，歸藏輯本作分，秦簡作介——《別卦》作介，可證輯本之「分」為「介」之訛"],
+   "艮":["少過","小過",""],"兌":["歸妹","歸妹",""],"勞":["解","解","上博簡作糸解"],
+   "羅":["酆","豐","帛書《衷》亦作酆"],"巽":["恒","恒",""]},
+ "坤":{"坤":["坤","坤","帛書作川，歸藏作寅形"],"乾":["泰","泰","有學者釋原簡為彘"],
+   "艮":["謙","謙","帛書作嗛，歸藏作兼"],"兌":["臨","臨","帛書作林，歸藏作林禍"],
+   "勞":["帀","師","上博簡亦作帀"],"羅":["亡夷","明夷","歸藏作明夷"],
+   "震":["復","復",""],"巽":["升","升","帛書作登，歸藏作稱"]},
+ "兌":{"兌":["兌","兌","帛書作奪"],"乾":["夬","夬",""],"坤":["萃","萃","帛書作卒"],
+   "艮":["咸","咸","帛書、歸藏、上博簡作欽，秦簡作咸"],"勞":["困","困","秦簡作囷"],
+   "羅":["悈","革","原簡心在戒下"],"震":["隨","隨","歸藏作規，帛書作隋"],"巽":["過","大過",""]},
+ "羅":{"羅":["羅","離","帛書亦作羅，秦簡作麗"],"乾":["少又","大有","秦簡作右"],
+   "坤":["晉","晉","帛書作溍"],"艮":["旅","旅",""],"兌":["睽","睽","帛書作乖，歸藏作瞿"],
+   "勞":["淒","未濟","上博簡作未淒"],"震":["噬嗑","噬嗑","帛書作筮閘，歸藏作筮"],
+   "巽":["鼑","鼎","鼑即貞字，秦簡作鼒"]},
+ "巽":{"巽":["巽","巽","帛書作筭"],"乾":["少䈞","小畜","帛書作少某，歸藏作小毒畜，秦簡作少督"],
+   "坤":["觀","觀","秦簡作灌"],"艮":["漸","漸",""],"兌":["中","中孚","帛書作中復"],
+   "勞":["渙","渙","歸藏作奐"],"羅":["嗹","家人","歸藏作散家人，秦簡作散"],"震":["益","益","益之籀文"]}
+};
+function bieSeq(up){const r=[up];BIE_DOWN.forEach(d=>{if(d!==up)r.push(d)});return r;}
+function paintBie(){
+  let h=`<h2>別卦</h2>
+  <div class="card" style="border-color:var(--zhu)"><p style="margin:0">
+  <b class="zhu">《別卦》與《筮法》關係不緊密，同輯不等於同系。</b>
+  形制明顯不同：《筮法》簡長35cm、三道編繩、簡背有編序符號並以絲帶粘貼；《別卦》簡長僅16cm、兩道編繩、簡背無編號。
+  ${SRC.LGS}因此懷疑二者可能分屬不同的易學系統。且《筮法》只用八經卦即可獨立占筮，根本不需《別卦》的六十四卦系統。
+  本頁僅為同輯材料之附錄，<b>不參與《筮法》之任何判斷</b>。</p></div>
+
+  <div class="card"><h3 style="margin-top:0">卦序之法 ${T_ORIG}</h3>
+  <p><small>八經卦依<b>上卦</b>分組，序為倝（乾）・艮・勞（坎）・徠（震）；坤・兌・羅（離）・巽——即父・少男・中男・長男；母・少女・中女・長女。
+  各組之內依<b>下卦</b>以乾坤・艮兌・勞羅・徠巽為序，惟經卦本身移至組首。
+  ${SRC.LXQ}指此排列方式與馬王堆帛書基本相同；亦有謂可按乾坤・艮兌・勞羅・徠巽打混排列者，尚待討論。${T_YI}</small></p></div>
+
+  <div class="card"><h3 style="margin-top:0">六十四別卦</h3>
+  <p><small>橫列為八經卦（上卦），縱行為組內次序。點格看細節。<span class="zhu">朱底＝勞經整簡缺失</span>，其八卦名不存，所列為依卦序推補之通行名。</small></p>
+  <div class="bg"><div class="hd">序</div>`;
+  BIE_UP.forEach(u=>h+=`<div class="hd">${BIE[u][u][0]||"（缺）"}<small>${u}經</small></div>`);
+  for(let i=0;i<8;i++){
+    h+=`<div class="hd">${i+1}</div>`;
+    BIE_UP.forEach(u=>{
+      const d=bieSeq(u)[i], e=BIE[u][d], miss=(u==="勞");
+      h+=`<div class="q${miss?" miss":""}" tabindex="0" data-u="${u}" data-d="${d}">
+        <b>${e[0]||"—"}</b><small>${e[1]}</small></div>`;
+    });
+  }
+  h+=`</div><div id="biedet" style="margin-top:10px"><small>點任一格顯示細節。</small></div></div>
+
+  <div class="card"><h3 style="margin-top:0">校記</h3>
+  <p><b>① 勞（坎）經整簡缺失。</b>原本八支簡、每支一經卦，今存七支。所缺者為勞經，故該組八個卦名全不可知。表中所列勞經一行為依卦序推補之通行名，<b>非簡文</b>。${T_BU}</p>
+  <p><b>② 豫作「介」，可正輯本《歸藏》之訛。</b>${SRC.LXQ}指出：豫卦在《歸藏》輯本依李過《西溪易說》作「分」，王家台《歸藏》簡出土後作「介」，而《別卦》正作「介」，可證「分」為「介」之訛。發表王家台簡者曾疑原字為「余」，李學勤自言亦曾如此設想，今認為不對。</p>
+  <p><b>③ 剝之簡名有異文。</b>本引擎依易學網錄作「僕」（並云《歸藏》亦作僕）；${SRC.LGS}文中則作「僂」。二者未能兩存，須俟原書。${T_CUN}</p>
+  <p><b>④ 既濟之簡名不可知。</b>未濟作「淒」（《說文》：雲雨起也）。易學網據此推既濟或當作「濟」或「霽」（雨止），文從理順，然<b>既濟屬缺失之勞經</b>，無簡可證。${T_CUN}</p>
+  <p><b>⑤ 六十四卦次序與《周易》絕不相同。</b>${SRC.LGS}舉證：《別卦》訟卦後為同人，蒙卦後為賁，師卦後為明夷。李過所記《歸藏》「與《周易》次序大略亦同」之說，於此不合。</p>
+  <p><b>⑥ 卦畫為三畫。</b>${SRC.LGS}：《別卦》雖為六十四卦系統，其八經卦所用卦畫依然是三畫；表中並未畫出完整卦象，起頭之經卦亦省略。故《別卦》實為八卦系統與六十四卦系統之合體，或即《筮法》八卦系統與他系六十四卦系統轉換時的輔助材料。</p>
+  <p><b>⑦ 簡無序號。</b>整理者只能依內容排列。本頁所呈為整理者之排法。</p>
+  </div>
+
+  <div class="card"><small>本頁卦名與異文錄自易學網〈清華簡《別卦》詳解〉（繁體工作本），該站原創註解不錄；
+  校記諸條另據${SRC.LXQ}發布會講話與${SRC.LGS}論文。原書為中西書局《清華大學藏戰國竹簡（肆）》，<span class="zhu">未取得</span>。</small></div>`;
+  document.getElementById("bieout").innerHTML=h;
+  setTimeout(()=>{document.querySelectorAll(".bg div.q").forEach(el=>{
+    const f=()=>{const u=el.dataset.u,d=el.dataset.d,e=BIE[u][d];
+      document.getElementById("biedet").innerHTML=
+        `<div class="hit"><b>${e[0]||"（簡名不存）"}　＝　${e[1]}</b><span class="why">
+         上卦 ${u}（${GUA[u].sym} ${GUA[u].tong}）・下卦 ${d}（${GUA[d].sym} ${GUA[d].tong}）
+         ${u==="勞"?'　<span class="zhu">勞經缺簡，此名為推補</span>':""}
+         ${e[2]?"<br>異文："+e[2]:""}</span></div>`;};
+    el.onclick=f; el.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();f();}};
+  });},0);
+}
 
 /* ── 文獻 ── */
 function paintWenxian(){
@@ -661,7 +863,8 @@ function paintWenxian(){
 
   <div class="card"><h3 style="margin-top:0">未驗之層</h3><ul>
    <li><b class="zhu">規則層僅回驗二例</b>——第一節前二卦例之筮數已得（陳睿宏所錄），本引擎推得之四位卦名與劉佳佩集釋所附全同（2/2）。餘五十五例之筮數仍缺。</li>
-<li><b class="zhu">卦名層可補而未補</b>——劉佳佩集釋於各卦例附有四位卦名，若逐節錄出，即可回驗全部「卦身類」判準（三左同右・三男同女・相見在上・數出數內・四季吉凶合議）；「爻位類」判準（六虛・中心四爻・惡爻居之・祟）仍須真筮數。程式初抽僅得 27/57，錄文格式不一，須逐頁校讀，不宜自動化上線。</li>
+<li><b>卦名層已補齊（57/57）</b>——錄自劉佳佩集釋各卦例所附之四位卦名。抽錄之法：以版面座標抓取成對之卦名列，再依集釋之節標題歸屬，逐節與集釋所分例數對表，十七節數目自動相符；其餘二節（第九〈咎〉、第十五〈小得〉第四例）之卦名未作並列排版，係據集釋所引整理者、馬楠、子居案語推定，介面標<span class="zhu">整理者補</span>。回驗結果見卦例分頁。</li>
+<li><b class="zhu">爻位類判準仍未回驗</b>——六虛・中心四爻同・惡爻居之・祟，皆須真筮數，現僅二例可測。</li>
    <li>「昭穆」無可判之式，標未能通解。</li>
    <li>「當日・當辰・遂日」須筮日干支，v0.1 未收；且「當日」之義整理者與暮四郎有異說。</li>
    <li>《別卦》尚未併入（已決定併入本案）。</li>
@@ -718,8 +921,8 @@ function selfCheck(){
   t(34,TALLY[6].reduce((a,b)=>a+b,0)-TALLY2[6]===4,"六：兩家差四筆");
   t(35,TALLY[7].reduce((a,b)=>a+b,0)-TALLY2[7]===-4,"七：兩家差四筆（與六互移）");
   t(36,684===Object.values(TALLY2).reduce((a,b)=>a+b,0),"另家統計總和亦 684");
-  t(37,LIE.length===JIE.reduce((a,x)=>a+x[2],0),"卦例空殼數與分節表相符");
-  t(38,LIE.filter(x=>x.yao===null).length===LIE.length-2,"除已得之二例外，卦例筮數皆空（不得虛構）");
+  t(37,LIEDATA.length===57,"卦例資料五十七筆");
+  t(38,LIE.filter(x=>x.yao===null).length===55,"除已得之二例外，五十五例筮數皆空（不得虛構）");
   t(39,RULES.length>=14,"判準條數");
   t(40,RULES.filter(r=>r.cls==="爻位").length>=5,"爻位類判準不少於五條");
   const g0=pos({"左上":[7,7,7],"右上":[6,6,6],"左下":[7,7,7],"右下":[6,6,6]});
@@ -727,14 +930,29 @@ function selfCheck(){
   t(42,PAIR["勞"]==="羅"&&PAIR["艮"]==="兌","配偶對：勞羅・艮兌");
   t(43,SIZHENG.has("震")&&SIZHENG.has("兌")&&!SIZHENG.has("乾"),"四正卦為震羅勞兌");
   t(44,LEFT.size===4&&RIGHT.size===4&&[...LEFT].every(x=>!RIGHT.has(x)),"左右各四卦，不重疊");
-  const filled=LIE.filter(x=>x.yao);
-  t(45,filled.length===2,"已填入之卦例二例");
-  t(46,filled.every(x=>WEI.every(w=>guaOf(x.yao[w])===x.gua[w])),"卦例回驗：所推四位卦名與集釋全同（2/2）");
+    t(45,LIE.filter(x=>x.yao).length===2,"已填入之卦例二例");
+  t(46,LIE.filter(x=>x.yao).every(x=>WEI.every(w=>guaOf(x.yao[w])===x.gua[w])),"卦例回驗：所推四位卦名與集釋全同（2/2）");
   t(47,guaOf(LIE[0].yao["左上"])==="巽"&&guaOf(LIE[0].yao["左下"])==="羅","第一節例一：左上巽・左下羅（離）");
   t(48,guaOf(LIE[1].yao["右上"])==="艮","第一節例二：右上艮");
   t(49,Object.keys(GUA)[0]==="乾"&&Object.keys(GUA)[2]==="艮"&&Object.keys(GUA)[3]==="兌","卦序依原書（乾坤艮兌…）");
   t(50,Math.abs((TALLY[6].reduce((a,b)=>a+b,0)+TALLY[7].reduce((a,b)=>a+b,0))/684-0.923)<0.005,"六七合計約 92%（與劉光勝所記相符）");
 
+  t(45.1,LIE.length===57,"卦例五十七例");
+  const cnt={};LIE.forEach(x=>cnt[x.jie]=(cnt[x.jie]||0)+1);
+  const EXPJ={1:9,2:11,3:2,4:2,5:2,6:2,7:2,8:3,9:1,10:1,11:2,12:1,13:1,14:8,15:4,16:2,17:2,19:2};
+  t(45.2,Object.keys(EXPJ).every(k=>cnt[k]===EXPJ[k]),"各節例數與集釋所分相符");
+  t(45.3,!cnt[18],"第十八節無卦例");
+  t(45.4,LIE.filter(x=>x.tui).length===2,"據案語推定者二例（第九・第十五節）");
+  t(45.5,LIE.every(x=>WEI.every(w=>GUA[x.gua[w]])),"所錄卦名皆為八經卦之一");
+  const bc=backCheck();
+  t(45.6,bc.length>=12&&bc.every(x=>x.ok),`卦例回驗 ${bc.filter(x=>x.ok).length}/${bc.length} 全合`);
+  t(51,Object.keys(BIE).length===8&&BIE_UP.length===8,"別卦八經卦俱全");
+  t(52,BIE_UP.every(u=>Object.keys(BIE[u]).length===8),"每經卦八個下卦，合六十四");
+  t(53,BIE_UP.every(u=>{const q=bieSeq(u);return q[0]===u&&q.length===8&&new Set(q).size===8;}),"組內序：經卦居首，八卦不重複");
+  t(54,BIE["乾"]["坤"][1]==="否"&&BIE["艮"]["坤"][1]==="剝"&&BIE["震"]["坤"][1]==="豫","上下卦組合對應通行卦名正確（否・剝・豫）");
+  t(55,BIE["震"]["坤"][0]==="介","豫之簡名作介（可正輯本《歸藏》之「分」）");
+  t(56,BIE_UP.filter(u=>bieSeq(u).every(d=>BIE[u][d][0]==="")).length===1&&BIE["勞"]["勞"][0]==="","唯勞經全組簡名不存（缺簡），其餘皆有");
+  t(57,new Set(BIE_UP.flatMap(u=>bieSeq(u).map(d=>BIE[u][d][1]))).size===64,"六十四通行卦名互異，無重無漏");
   const pass=R.filter(x=>x.ok).length;
   document.getElementById("selfout").innerHTML=`<h2>自檢</h2>
    <p><b class="${pass===R.length?"ok":"bad"}">${pass} / ${R.length} 通過</b>　
@@ -748,7 +966,7 @@ function selfCheck(){
 document.getElementById("ming").innerHTML=MING.map(m=>`<option${m==="得"?" selected":""}>${m}</option>`).join("");
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.setAttribute("aria-selected",x===b));
-  ["t1","t2","t3","t4","t5","t6"].forEach(id=>document.getElementById(id).hidden=(id!==b.dataset.t));
+  ["t1","t2","t7","t3","t4","t5","t6"].forEach(id=>document.getElementById(id).hidden=(id!==b.dataset.t));
 });
 document.getElementById("reg").addEventListener("change",paintGrid);
 document.getElementById("run").onclick=run;
@@ -757,7 +975,7 @@ document.getElementById("demo").onclick=()=>{
   Object.assign(state,{"左上":[6,7,6],"右上":[7,6,6],"左下":[5,9,6],"右下":[6,7,6]});
   buildGrid();run();
 };
-buildGrid();paintTables();paintChengua();paintLie();paintWenxian();selfCheck();run();
+buildGrid();paintTables();paintChengua();paintLie();paintBack();paintBie();paintWenxian();selfCheck();run();
 </script>
 </body>
 </html>
