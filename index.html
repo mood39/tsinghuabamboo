@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>清華簡《筮法》查驗器 v0.5</title>
+<title>清華簡《筮法》查驗器 v0.7</title>
 <style>
 :root{
   --pith:#E3DDC6;      /* 竹黃 */
@@ -121,10 +121,11 @@ summary{cursor:pointer;font-size:.88rem;letter-spacing:.06em}
 <body>
 <div class="wrap">
 <h1>清華簡《筮法》查驗器</h1>
-<div class="sub">v0.5　戰國非《周易》占筮系統　四位・十七命・卦位圖　—　只查驗，不起卦</div>
+<div class="sub">v0.7　戰國非《周易》占筮系統　四位・十七命・卦位圖</div>
 
 <nav role="tablist">
-  <button role="tab" aria-selected="true" data-t="t1">查驗</button>
+  <button role="tab" aria-selected="true" data-t="t0">導覽</button>
+  <button role="tab" aria-selected="false" data-t="t1">查驗</button>
   <button role="tab" aria-selected="false" data-t="t2">卦例</button>
   <button role="tab" aria-selected="false" data-t="t7">別卦</button>
   <button role="tab" aria-selected="false" data-t="t3">查表</button>
@@ -133,19 +134,29 @@ summary{cursor:pointer;font-size:.88rem;letter-spacing:.06em}
   <button role="tab" aria-selected="false" data-t="t6">自檢</button>
 </nav>
 
+<!-- ═══ 導覽 ═══ -->
+<section id="t0"><div id="navout"></div></section>
+
 <!-- ═══ 查驗 ═══ -->
-<section id="t1">
+<section id="t1" hidden>
   <div class="card">
     <p style="margin-top:0"><small>填入十二筮數（四位 × 三爻，值域四五六七八九）。七在簡上書作「一」。<span class="zhu">四五八九</span>為惡爻，顯朱色。</small></p>
     <div class="siwei" id="grid"></div>
     <div class="row">
+      <label>筮日 <input class="big" type="date" id="sday" value="2026-08-13" style="width:9.5em"></label>
+      <span id="gzshow" style="font-size:.82rem"></span>
       <label>季節 <select class="big" id="season"><option value="春">春</option><option value="夏">夏</option><option value="秋">秋</option><option value="冬">冬</option></select></label>
       <label>命 <select class="big" id="ming"></select></label>
       <label>稱謂 <select class="big" id="reg">
         <option value="軍旅">軍旅</option><option value="家人">家人</option>
         <option value="爵位">爵位</option><option value="宮室">宮室</option></select></label>
       <button class="act" id="run">查驗</button>
-      <button class="act ghost" id="demo">載入示例</button>
+      <button class="act ghost" id="demo">載入卦例</button>
+      <label>起卦法 <select class="big" id="cmode">
+        <option value="甲">甲・楚簡實占分布</option>
+        <option value="乙">乙・卦例分布（含爻位）</option>
+        <option value="丙">丙・五十五策五變</option></select></label>
+      <button class="act" id="cast">一鍵成卦</button>
     </div>
   </div>
   <div id="out"></div>
@@ -230,6 +241,8 @@ function guaOf(y){ // y=[下,中,上] 之筮數
 
 /* ── 四位座標 ── */
 const WEI=["左上","右上","左下","右下"];
+/* 輸出序：自內而外、自尊而卑（盤面位置不變，僅列示順序依四位表兩軸） */
+const WEID=["右下","右上","左下","左上"];
 const AXIS={  // 據第二十節〈四位表〉原表
   "右下":{nei:"內",zun:"卑位側",note:"內・身・主"},
   "左上":{nei:"外",zun:"卑位側",note:"外・彼・客"},
@@ -365,6 +378,106 @@ function jiCount(g,s){
   return {r,ji,xiong,non};
 }
 
+
+
+/* ════════ 筮日干支（第五・九・十・十八節之「當日」「當辰」所須） ════════
+   錨點：1949-10-01 為甲子日。此為本引擎所採之單一錨點，其餘皆由六十甲子推algo。 */
+const GAN10=["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const ZHI12=["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+function jdn(y,m,d){ // 格里曆
+  const a=Math.floor((14-m)/12), yy=y+4800-a, mm=m+12*a-3;
+  return d+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045;
+}
+const JD_JIAZI=jdn(1949,10,1);
+function dayGZ(y,m,d){
+  let k=(jdn(y,m,d)-JD_JIAZI)%60; if(k<0)k+=60;
+  return {g:GAN10[k%10], z:ZHI12[k%12], i:k};
+}
+/* 干→卦（第二十五節反查）；支→卦（第二十七節反查，乾坤不與） */
+function guaOfGan(gan){ for(const k in GAN) if(GAN[k].includes(gan)) return k; return null; }
+function guaOfZhi(zhi){ for(const k in ZHI_GUA) if(ZHI_GUA[k].includes(zhi)) return k; return null; }
+/* 支→筮數（第二十八節反查） */
+function numOfZhi(zhi){ for(const n in ZHI_YAO) if(ZHI_YAO[n].includes(zhi)) return +n; return null; }
+
+/* ════════ 白譯 ════════ */
+const BAI_WEI={
+ "右下":"這一位是「你自己」——本人、本方、事情的內裡。看一張盤先看這裡。",
+ "右上":"這一位是「你上面的人」——尊者、貴人、君長，也是門戶所在。",
+ "左下":"這一位是「你下面的人」——卑者、部屬、妻室，也是庭院所在。",
+ "左上":"這一位是「對方」——外人、客方、事情的外緣。與右下相對而看。"};
+const BAI_RULE={
+ "三左同右":"四位裡有三個屬左卦、一個屬右卦。少數的那一個是關鍵，眾寡之勢已分。",
+ "三右同左":"四位裡有三個屬右卦、一個屬左卦。同上，孤立的那一位受眾。",
+ "三男同女":"三個男卦圍著一個女卦。原書〈祟〉節附語「男勝女，眾勝寡」，可與此參看。",
+ "三女同男":"三個女卦圍著一個男卦。多見於問娶妻、問男女之事。",
+ "相見在上":"上面兩位恰是一對配偶卦（乾坤・震巽・勞羅・艮兌）。相見即相遇、相合之象。",
+ "妻夫相見":"相鄰兩位成配偶卦。問婚嫁、問死者、問和合之事最重此象。",
+ "數出（兌在右上）":"兌落在右上，原書判為「數而出」——事情往外走、往外洩。",
+ "數內（兌在左上）":"兌落在左上，原書判為「數而入」——事情往內收、往內歸。",
+ "至：四正之卦見":"四位中出現震・羅・勞・兌之一（四正卦），主「至」，人事會到。四隅卦則須改換位置才至。",
+ "六虛":"左右合看，六個爻位上都有陽爻。第一節以此象斷「亓病哭死」。",
+ "同次（四位次爻相同）":"四位的中間一爻陰陽一致。第十九節以此斷相爭、相惡，問軍旅則主不和。",
+ "成：中心四爻同":"左右兩卦最中間的四個爻相同。第十七節以此斷講和能成；不同則不成。",
+ "男女：上去二下去一":"問生男生女之法：上卦去掉上面兩爻、下卦去掉下面一爻，剩下三爻重成一卦，看它是男卦還是女卦。",
+ "惡爻居之":"盤上出現四・五・八・九。這四個數才帶占斷意義，六與七只是陰陽的記號。惡爻所在之位，即是事情的著力點。"};
+
+/* ════════ 起卦（成卦） ════════
+   本引擎「只查驗、不起卦」之原則已於 v0.6 放寬為「可起卦，但每一模式皆標明其性質」。
+   《筮法》全篇未載成卦之法，以下三式無一為經文所有。 */
+function rndInt(n){ // 1..n-1，crypto 均勻源
+  if(n<=2) return 1;
+  const range=n-1, max=Math.floor(4294967296/range)*range;
+  const a=new Uint32Array(1);
+  for(;;){ crypto.getRandomValues(a); if(a[0]<max) return 1+(a[0]%range); }
+}
+function pick(w){ // 依權重表抽一
+  const ks=Object.keys(w), tot=ks.reduce((a,k)=>a+w[k],0);
+  const a=new Uint32Array(1); crypto.getRandomValues(a);
+  let r=(a[0]/4294967296)*tot;
+  for(const k of ks){ r-=w[k]; if(r<0) return +k; }
+  return +ks[ks.length-1];
+}
+/* 甲：楚簡實占分布。四五八九取葛陵・包山・天星觀三簡之平均（劉光勝所列），
+   六七之比則卦例所無從得，暫依卦例實測 323:308。 */
+const W_SHIZHAN={4:0.1,5:1.7,8:6.3,9:0.7,6:46.6,7:44.6};
+/* 乙：卦例實測分布，且逐爻位取值（下/中/上各異） */
+const W_LIEWEI=[{},{},{}];
+/* 丙：五十五策五變（易學網重建）——見下 castYao55 */
+const TRANS={ // 左→右之變化實測（易學網自五十七卦例所整理）
+ 4:{4:2,6:1,7:2}, 5:{5:4,6:3,7:2}, 6:{6:68,7:88}, 7:{7:62,6:89}, 8:{8:2,6:2,9:4}, 9:{9:6,6:4,7:3}
+};
+function r4(x){const m=x%4;return m===0?4:m;}
+function castYao55(){
+  let N=55, a=rndInt(N), b=N-a;
+  N-=(r4(a)+r4(b));            // 第一變：不掛一
+  let L=0,R=0;
+  for(let v=0;v<4;v++){
+    N-=1; a=rndInt(N); b=N-a;
+    const ra=r4(a), rb=r4(b); L+=ra; R+=rb; N-=(ra+rb);
+  }
+  const num=N/4;
+  let chg;
+  if(L===R) chg=num;
+  else if(num===6) chg=7; else if(num===7) chg=6;
+  else if(num===8) chg=(R<L)?6:9;
+  else chg=(R<L)?6:7;
+  return [num,chg];
+}
+function fillLiewei(){[0,1,2].forEach(i=>{[4,5,6,7,8,9].forEach(n=>{W_LIEWEI[i][n]=TALLY[n][i];});});}
+function castOne(mode,pos){
+  if(!W_LIEWEI[0][6]) fillLiewei();
+  if(mode==="丙") return castYao55();
+  const w = mode==="乙" ? W_LIEWEI[pos] : W_SHIZHAN;
+  const n = pick(w);
+  return [n, pick(TRANS[n])];
+}
+function castAll(mode){
+  const L=[],R=[];
+  for(let i=0;i<6;i++){ const [a,b]=castOne(mode,i%3); L.push(a); R.push(b); }
+  // 由下而上：爻1-3 為下位卦，爻4-6 為上位卦
+  return {"左下":L.slice(0,3),"左上":L.slice(3,6),"右下":R.slice(0,3),"右上":R.slice(3,6)};
+}
+
 /* ════════ 介面 ════════ */
 const state={"左上":[7,7,7],"右上":[7,7,7],"左下":[7,7,7],"右下":[7,7,7]};
 
@@ -403,88 +516,125 @@ function paintGrid(){
 }
 
 function run(){
-  const s=document.getElementById("season").value;
+  const ss=document.getElementById("season").value;
   const m=document.getElementById("ming").value;
   const reg=document.getElementById("reg").value;
+  const sd=(document.getElementById("sday").value||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const GZ=sd?dayGZ(+sd[1],+sd[2],+sd[3]):null;
+  const gzs=document.getElementById("gzshow"); if(gzs) gzs.textContent=GZ?GZ.g+GZ.z+"日":"";
   const g=pos(state);
   let h=`<h2>判斷</h2>`;
 
+  // 〇、白話總覽
+  h+=`<div class="card"><h3 style="margin-top:0">這張盤在說什麼</h3><p><small>
+   四位就是四個三畫卦，排成田字。<b>右下是你自己，左上是對方；右上是尊、左下是卑。</b>
+   十二個筮數裡，六與七只是陰陽的記號，<b class="zhu">四五八九才帶意義</b>——原書叫「惡爻」，
+   它們落在哪一位、哪一爻，就是事情的著力點。以下逐層說。</small></p>`;
+  h+=WEID.map(w=>`<div class="hit"><b>${w}　${REG[reg][w]}　${GUA[g[w]].sym} ${g[w]}（${GUA[g[w]].bie}）</b>
+    <span class="why">${BAI_WEI[w]}</span></div>`).join("");
+  h+=`</div>`;
+
   // 一、四位
-  h+=`<div class="card"><h3 style="margin-top:0">四位</h3><table><tr><th>位</th><th>${reg}</th><th>卦</th><th>別</th><th>五行</th><th>方</th><th>四季（${s}）</th></tr>`;
-  WEI.forEach(w=>{
-    const k=jixiong(g[w],s);
-    const bu=k&&SEASON[s].bu.includes(k);
+  h+=`<div class="card"><h3 style="margin-top:0">四位</h3><table><tr><th>位</th><th>${reg}</th><th>卦</th><th>別</th><th>五行</th><th>方</th><th>四季（${ss}）</th></tr>`;
+  WEID.forEach(w=>{
+    const k=jixiong(g[w],ss), bu=k&&SEASON[ss].bu.includes(k);
     h+=`<tr><td>${w}<br><small>${AXIS[w].note}</small></td><td>${REG[reg][w]}</td>
         <td>${GUA[g[w]].sym} ${g[w]}</td><td>${GUA[g[w]].bie}</td>
         <td>${WUXING[g[w]]||'<span class="zhu">未定</span>'}</td><td>${FANG[g[w]]}</td>
-        <td class="${k&&!isJi(k)?'zhu':'ok'}">${k||"—"}${bu?T_BU:""}</td></tr>`;
-  });
-  h+=`</table><small>乾坤五行原書未給，四說並存，本引擎不代擬。</small></div>`;
+        <td class="${k&&!isJi(k)?'zhu':'ok'}">${k||"—"}${bu?T_BU:""}</td></tr>`;});
+  h+=`</table><small>乾坤不入四季表，五行原書亦未給，四說並存，本引擎不代擬。</small></div>`;
 
   // 二、四季合議
-  const jc=jiCount(g,s);
+  const jc=jiCount(g,ss);
   h+=`<div class="card"><h3 style="margin-top:0">四季吉凶合議</h3>`;
-  if(jc.non.length) h+=`<p><small>乾坤不入四季表，故本盤 ${jc.non.length} 位不參與合議。</small></p>`;
-  if(jc.ji.length===3&&jc.xiong.length===1) h+=`<div class="hit"><b>三吉同兇</b><span class="why">${jc.ji.map(x=>x.g).join("")} 吉／${jc.xiong[0].g} 凶</span></div>`;
-  if(jc.xiong.length===3&&jc.ji.length===1) h+=`<div class="hit"><b>三兇同吉</b><span class="why">${jc.xiong.map(x=>x.g).join("")} 凶／${jc.ji[0].g} 吉</span></div>`;
-  if((jc.ji.length===3&&jc.xiong.length===1)||(jc.xiong.length===3&&jc.ji.length===1)){
+  if(jc.non.length) h+=`<p><small>本盤有 ${jc.non.length} 位為乾坤，不入四季表，不參與合議。</small></p>`;
+  const three=(jc.ji.length===3&&jc.xiong.length===1)||(jc.xiong.length===3&&jc.ji.length===1);
+  if(jc.ji.length===3&&jc.xiong.length===1) h+=`<div class="hit"><b>三吉同兇</b><span class="why">${jc.ji.map(x=>x.g).join("")} 吉／${jc.xiong[0].g} 凶。<br>白話：三位當令、一位失令，孤立的那一位是病灶。</span></div>`;
+  if(jc.xiong.length===3&&jc.ji.length===1) h+=`<div class="hit"><b>三兇同吉</b><span class="why">${jc.xiong.map(x=>x.g).join("")} 凶／${jc.ji[0].g} 吉。<br>白話：只有一位當令，獨木難支。</span></div>`;
+  if(three){
     const eh=RULES.find(r=>r.id==="惡爻居之").fn(g,state);
-    h+=`<div class="hit"><b>${eh.ok?"惡爻居之 → 今焉死":"待死"}</b><span class="why">${eh.why}　（第一節〈死生〉）</span></div>`;
-  }
-  if(jc.ji.length!==3&&jc.xiong.length!==3) h+=`<p><small>非三一之局，第一節所舉諸例不適用。</small></p>`;
+    h+=`<div class="hit"><b>${eh.ok?"惡爻居之 → 今焉死":"無惡爻 → 待死"}</b><span class="why">${eh.why}
+      <br>白話：第一節斷語——三一之局本已凶，若再有惡爻壓在上頭，凶事就在眼前；沒有惡爻，則是拖著等。</span></div>`;
+  } else h+=`<p><small>非三比一之局，第一節〈死生〉所舉諸例不適用。</small></p>`;
   h+=`</div>`;
 
   // 三、判準
   h+=`<div class="card"><h3 style="margin-top:0">判準</h3>`;
   ["卦身","位置","爻位"].forEach(c=>{
-    h+=`<h3>${c}</h3>`;
+    h+=`<h3>${c}類</h3>`;
     RULES.filter(r=>r.cls===c).forEach(r=>{
       const v=r.fn(g,state);
-      h+=`<div class="hit ${v.ok?"":"no"}"><b>${v.ok?"◉":"○"} ${r.id}</b><span class="why">${v.why}</span></div>`;
-    });
+      h+=`<div class="hit ${v.ok?"":"no"}"><b>${v.ok?"◉ 成立":"○ 不成立"}　${r.id}</b>
+        <span class="why">${v.why}${v.ok&&BAI_RULE[r.id]?"<br>白話："+BAI_RULE[r.id]:""}</span></div>`;});
   });
-  h+=`<div class="hit no"><b>○ 昭穆</b><span class="why">四位依長幼先後內外之次序排列。${T_WEI} 原書未給可判之式，不代擬。</span></div>`;
-  h+=`<div class="hit no"><b>○ 當日・當辰・遂日</b><span class="why">須輸入筮問之日干支，v0.1 未收。</span></div></div>`;
+  h+=`<div class="hit no"><b>○ 昭穆</b><span class="why">四位依長幼先後內外之次序排列。${T_WEI} 原書未給可判之式，不代擬。</span></div>
+   </div>`;
+
+  // 三之二、當日・當辰
+  h+=`<div class="card"><h3 style="margin-top:0">當日・當辰</h3>`;
+  if(!GZ) h+=`<p><small>筮日未填或格式不合，無法推算。</small></p>`;
+  else{
+    const gg=guaOfGan(GZ.g), gz=guaOfZhi(GZ.z), nz=numOfZhi(GZ.z);
+    const wg=WEID.filter(w=>g[w]===gg), wz=gz?WEID.filter(w=>g[w]===gz):[];
+    const wy=[]; WEID.forEach(w=>state[w].forEach((n,i)=>{if(n===nz)wy.push(`${w}・${["下","中","上"][i]}爻`)}));
+    h+=`<p><small>筮日 <b class="mono">${GZ.g}${GZ.z}</b>。日干 ${GZ.g} 配 <b>${gg}</b>（第二十五節）；
+     日支 ${GZ.z} 配 <b>${gz||"—"}</b>（第二十七節，乾坤不與）、配筮數 <b class="mono">${NUMCH[nz]}</b>（第二十八節）。</small></p>`;
+    h+=`<div class="hit ${wg.length?"":"no"}"><b>${wg.length?"◉ 成立":"○ 不成立"}　當日</b>
+      <span class="why">${wg.length?`日干之卦 ${gg} 見於 ${wg.join("、")}`:`日干之卦 ${gg} 不見於四位`}
+      ${wg.length?"<br>白話：所問之事與今日相應，事在眼前。":""}</span></div>`;
+    h+=`<div class="hit ${wz.length?"":"no"}"><b>${wz.length?"◉ 成立":"○ 不成立"}　當辰</b>
+      <span class="why">${gz?(wz.length?`日支之卦 ${gz} 見於 ${wz.join("、")}`:`日支之卦 ${gz} 不見於四位`):"日支所配之卦不在表中"}
+      ${wz.length?"<br>白話：時辰相應，與當日同看。":""}</span></div>`;
+    h+=`<div class="hit ${wy.length?"":"no"}"><b>${wy.length?"◉":"○"}　日支所配之筮數見於盤</b>
+      <span class="why">${wy.length?`${NUMCH[nz]} 見於 ${wy.join("、")}`:`盤上無 ${NUMCH[nz]}`}
+      <br><small>此層據第二十八節〈地支與爻〉推得，原書未明言其用法，本引擎僅列落點。${T_CUN}</small></span></div>`;
+    // 第十八節
+    const su=wg.length>0&&wz.length>0;
+    h+=`<div class="hit ${su?"":"no"}"><b>第十八節〈志事〉：${su?"見當日如當辰 → 速":"不俱見 → 五日為來，乃中期"}</b>
+      <span class="why">白話：日干與日支所配之卦都在盤上，事來得快；否則以五日為期，屬中程。</span></div>`;
+    h+=`<div class="hit no"><b>○ 遂（述）日</b><span class="why">第九節〈咎〉「見述日，妻夫、昭穆、上毀，亡咎」。
+      「述日」之義諸家未有定說，${T_WEI} 本引擎不代擬。</span></div>`;
+  }
+  h+=`<small>錨點：一九四九年十月一日為甲子日，其餘由六十甲子推。所用為格里曆，一五八二年以前未作儒略曆修正。${T_CUN}</small></div>`;
 
   // 四、爻象
-  const es=[]; WEI.forEach(w=>state[w].forEach((n,i)=>{if(E.has(n))es.push({w,i,n});}));
-  h+=`<div class="card"><h3 style="margin-top:0">爻象（第二十九節）</h3>`;
-  if(!es.length) h+=`<p><small>四位皆常爻（六・七），無爻象可取。〈爻象〉〈祟〉二節只論四五八九。</small></p>`;
-  else es.forEach(x=>{
-    const y=YAOXIANG[x.n];
-    let extra="";
-    if(x.n===8) extra=x.i===2?`　在上為 ${y.shang}`:(x.i===0?`　在下為 ${y.xia}`:"");
-    h+=`<div class="hit"><b>${x.w}・${["下","中","上"][x.i]}爻 ${NUMCH[x.n]}</b><span class="why">為 ${y.xiang.join("、")}${extra}</span></div>`;
-  });
+  const es=[]; WEID.forEach(w=>state[w].forEach((n,i)=>{if(E.has(n))es.push({w,i,n});}));
+  h+=`<div class="card"><h3 style="margin-top:0">爻象</h3>`;
+  if(!es.length) h+=`<p><small>四位全是常爻（六・七），無爻象可取。<b>這是常態</b>——實占記錄中六七約佔九成。〈爻象〉〈祟〉二節只論四五八九。</small></p>`;
+  else{
+    h+=`<p><small>本盤有 ${es.length} 個惡爻。爻象即該數所取之物象，可據以想事情的樣貌。</small></p>`;
+    es.forEach(x=>{const y=YAOXIANG[x.n];
+      let ex=""; if(x.n===8) ex=x.i===2?`　在上為 ${y.shang}`:(x.i===0?`　在下為 ${y.xia}`:"");
+      h+=`<div class="hit"><b>${x.w}・${["下","中","上"][x.i]}爻　${NUMCH[x.n]}</b><span class="why">為 ${y.xiang.join("、")}${ex}
+        <br>白話：此位（${BAI_WEI[x.w].split("——")[0].replace("這一位是","")}）帶著上列之象。</span></div>`;});
+  }
   h+=`</div>`;
 
   // 五、祟
   if(m==="祟"){
-    h+=`<div class="card"><h3 style="margin-top:0">祟（第二十六節）</h3>`;
-    WEI.forEach(w=>{
-      const gg=g[w], ys=state[w], list=SUI[gg]||[];
-      const pure=ys.every(n=>n===ys[0]);
-      const hits=list.filter(([cond])=>{
-        if(cond==="恆")return true;
-        if(cond==="純")return pure;
-        if(cond==="莫純")return !pure;
-        if(cond==="殽")return ys.includes(5)&&ys.includes(9);
-        if(cond==="一四一五")return ys.includes(4)&&ys.includes(5);
-        if(cond==="二五夾四")return ys[0]===5&&ys[2]===5&&ys[1]===4;
-        return ys.includes(+({"四":4,"五":5,"八":8,"九":9})[cond]);
-      });
-      if(hits.length) h+=`<div class="hit"><b>${w}　${gg}祟</b><span class="why">${hits.map(([c,v])=>`${c}：${v}`).join("；")}</span></div>`;
+    h+=`<div class="card"><h3 style="margin-top:0">祟</h3><p><small>問「祟」是問作祟的來源。每一位依其卦與所帶之惡爻，各有所主。</small></p>`;
+    let any=false;
+    WEID.forEach(w=>{
+      const gg=g[w], ys=state[w], list=SUI[gg]||[], pure=ys.every(n=>n===ys[0]);
+      const hits=list.filter(([c])=>{
+        if(c==="恆")return true; if(c==="純")return pure; if(c==="莫純")return !pure;
+        if(c==="殽")return ys.includes(5)&&ys.includes(9);
+        if(c==="一四一五")return ys.includes(4)&&ys.includes(5);
+        if(c==="二五夾四")return ys[0]===5&&ys[2]===5&&ys[1]===4;
+        return ys.includes(+({"四":4,"五":5,"八":8,"九":9})[c]);});
+      if(hits.length){any=true;
+        h+=`<div class="hit"><b>${w}　${gg}祟</b><span class="why">${hits.map(([c,v])=>`${c}：${v}`).join("；")}</span></div>`;}
     });
+    if(!any) h+=`<p><small>本盤諸位皆無所主。</small></p>`;
     h+=`<small>${SUI_FU}</small></div>`;
   }
 
   // 六、干支
   h+=`<div class="card"><h3 style="margin-top:0">四位所繫干支</h3><table><tr><th>位</th><th>卦</th><th>天干</th><th>地支</th></tr>`;
-  WEI.forEach(w=>h+=`<tr><td>${w}</td><td>${g[w]}</td><td>${GAN[g[w]].join("・")}</td>
-    <td>${(ZHI_GUA[g[w]]||["—"]).join("・")}</td></tr>`);
-  h+=`</table><small>乾坤不納地支（整理者：此表亦不計乾、坤）。</small></div>`;
+  WEID.forEach(w=>h+=`<tr><td>${w}</td><td>${g[w]}</td><td>${GAN[g[w]].join("・")}</td><td>${(ZHI_GUA[g[w]]||["—"]).join("・")}</td></tr>`);
+  h+=`</table><small>乾坤不納地支。天干配卦與京房納甲全同。</small></div>`;
 
-  h+=`<p><small>本引擎只列落點與判準之成立與否，不代為合判、不下總斷。<b>規則層尚未經卦例回驗</b>——五十七卦例之十二筮數未取得。</small></p>`;
+  h+=`<p><small>本引擎只列落點與判準之成立與否，<b>不代為合判、不下總斷</b>——怎麼取捨是看盤的人的事。</small></p>`;
   document.getElementById("out").innerHTML=h;
 }
 
@@ -572,13 +722,27 @@ function paintChengua(){
    <p><small>子居指出：上爻出現九、八的頻率大於四、五；中爻絕無四、九；上爻傾向大數。
    看表即明——<b class="mono">中爻的四與九都是 0</b>，而上爻之九有 19、下爻僅 4。
    凡「先筮成單爻再迭加成卦」的重建，三爻位分布必然相同，<b>結構上就產生不出這張表</b>。</small></p>
-   <table><tr><th>家</th><th class="l">要旨</th><th>爻位相依？</th></tr>
-   <tr><td>程浩<br><small>2014</small></td><td class="l">取「天地之數五十五」入《繫辭》占法，<b>五變成一爻</b>，所得 36/32/28/24/20/16 除四即四至九。與《繫辭》二異：用五十五而非四十九、五變而非三變</td><td class="bad">逐爻獨立 → 不過</td></tr>
-   <tr><td>賈連翔<br><small>2014</small></td><td class="l">重定義「掛一」為拿出一<b>捆</b>而非一根，實即將四十九根隨機分成三捆，各行揲四取餘；四營一變、三變成一爻。並指程浩之法所得四五八九之概率與已知條件抵牾</td><td class="bad">逐爻獨立 → 不過</td></tr>
-   <tr><td>劉彬<br><small>2014</small></td><td class="l">用五十六或五十七或五十八根蓍草，依大衍「一變」前之步驟，經五變得九八七六五四。自陳演算法「不止一種，而是若干種」</td><td class="bad">逐爻獨立 → 不過</td></tr>
-   <tr><td>十三籤拈取</td><td class="l">十三根蓍草或竹籤，以指拈起約半，得數以六七最可能；「扐」作動詞解，不須分掛揲</td><td class="bad">逐爻獨立 → 不過</td></tr>
-   <tr><td>由卦例反推</td><td class="l">自筮數分布與變爻行為倒推，不預設器具</td><td class="ok">可相容</td></tr>
+   <table><tr><th>家</th><th class="l">要旨</th><th>邊際分布</th><th>爻位相依</th></tr>
+   <tr><td>程浩<br><small>2014</small></td><td class="l">取「天地之數五十五」入《繫辭》占法，<b>五變成一爻</b>，所得 36/32/28/24/20/16 除四即四至九</td><td>未實作</td><td class="bad">逐爻獨立</td></tr>
+   <tr><td>賈連翔<br><small>2014</small></td><td class="l">「掛一」改為拿出一<b>捆</b>，即將四十九根隨機分三捆各揲四取餘；三變成一爻。並指程浩之法概率與已知條件抵牾</td><td>未實作</td><td class="bad">逐爻獨立</td></tr>
+   <tr><td>劉彬<br><small>2014</small></td><td class="l">五十六／五十七／五十八根蓍草，經五變得九八七六五四。自陳演算法「不止一種」</td><td>未實作</td><td class="bad">逐爻獨立</td></tr>
+   <tr><td><b>五十五策五變</b><br><small>易學網</small></td><td class="l">五十五策起手，第一變不掛一，二至五變左右分別歸奇；<b>左右歸奇之大小決定變與不變</b>——五家中唯一能同時生出左右兩卦者</td><td class="bad">惡爻 28.8%<br><small>實占 8–10%</small></td><td class="bad">逐爻獨立</td></tr>
+   <tr><td>十三籤拈取</td><td class="l">十三根竹籤以指拈起約半；「扐」作動詞解</td><td>未實作</td><td class="bad">逐爻獨立</td></tr>
+   <tr><td>由卦例反推</td><td class="l">自筮數分布倒推，不預設器具</td><td class="ok">可相容</td><td class="ok">可相容</td></tr>
    </table>
+   <div class="card"><h3 style="margin-top:0">母體在哪裡：不是卦例，是楚簡實占</h3>
+   <p><small>五十七卦例是<b>挑過的教學樣本</b>，不能當母體——此點易學網、劉彬、劉光勝皆已言明。
+   真正未經挑選的樣本是楚簡的實占記錄（${SRC.LGS}所列）：</small></p>
+   <table><tr><th>來源</th><th>八</th><th>五</th><th>九</th><th>四</th><th>惡爻合計</th></tr>
+   <tr><td>葛陵簡</td><td>4%</td><td>3%</td><td>1%</td><td>0%</td><td class="ok">約8%</td></tr>
+   <tr><td>包山簡</td><td>9%</td><td>1%</td><td>0%</td><td>0%</td><td class="ok">約10%</td></tr>
+   <tr><td>天星觀簡</td><td>6%</td><td>1%</td><td>1%</td><td>0%</td><td class="ok">約8%</td></tr>
+   <tr><td>《筮法》卦例</td><td>1.5%</td><td>1.9%</td><td>3.4%</td><td>1.0%</td><td>7.7%</td></tr>
+   <tr><td><b>五十五策五變</b></td><td class="bad">12.6%</td><td class="bad">9.2%</td><td class="bad">5.5%</td><td>1.6%</td><td class="bad">28.8%</td></tr>
+   </table>
+   <small><b>惡爻總量這一關，才是第一道檢定。</b>實占與卦例都落在 8–10%，五十五策五變則近三成——每三爻就吐一個惡爻，古人是十二爻才一個。
+   有趣的是卦例與實占的<b>總量相合而內部次序相反</b>（卦例九＞五＞八，實占八＞五＞九），這正是「卦例經挑選」的直接證據，也解釋了整理者何以稱其序為八五九四。
+   <br>本引擎實測：以 crypto 均勻源模擬五十五策五變六十萬爻所得，非引自他人。</small></div>
    <small>四家正式發表之重建皆為「先筮成單爻、再迭加成卦」，三爻位分布必然相同，故結構上產生不出上表。
    ${SRC.LB}自己也注意到此事：其稱概率規律為六七最多、五八次之、四九最少，而《筮法》一至十九節二百二十八個三畫卦之實際頻率「有相同處，也有不同處」，
    歸因於卦例的選擇性。${SRC.JLX}亦以概率與已知條件抵牾為由質疑${SRC.CH}之法——<b>以概率檢定成卦法，學界已有先例，本引擎只是把檢定推進到爻位這一層</b>。
@@ -893,6 +1057,46 @@ function paintBie(){
   });},0);
 }
 
+function paintNav(){
+  document.getElementById("navout").innerHTML=`<h2>這是什麼</h2>
+  <div class="card"><p style="margin-top:0">清華簡《筮法》是一套<b>戰國時代的占筮系統，不屬於《周易》</b>。
+  竹簡抄寫於公元前三百年前後，六十三支，是清華簡中唯一保持成卷狀態的一篇。
+  它不用卦名、不用卦爻辭，整篇是一部<b>占法說明書</b>：先舉卦例，再說怎麼判。</p>
+  <p>本引擎把那套判法寫成可執行的規則，讓你填入一張盤、看它逐條說話。<b>不代為總斷</b>——擺齊各家說法，取捨是看盤的人的事。</p></div>
+
+  <div class="card"><h3 style="margin-top:0">與《周易》差在哪</h3><table>
+   <tr><th>　</th><th>《筮法》</th><th>《周易》</th></tr>
+   <tr><td class="l">一盤幾個卦</td><td>四個三畫卦（四位）</td><td>一個六畫卦</td></tr>
+   <tr><td class="l">用什麼數</td><td>四五六七八九<b>六個</b></td><td>六七八九四個</td></tr>
+   <tr><td class="l">怎麼記</td><td>直接寫數字</td><td>寫陰陽符號</td></tr>
+   <tr><td class="l">靠什麼判</td><td>卦的位置、男女、左右、四季、爻位</td><td>卦名與卦爻辭</td></tr>
+   <tr><td class="l">坎離方位</td><td><b class="zhu">相反</b>：勞（坎）在南屬火、羅（離）在北屬水</td><td>離南坎北</td></tr>
+   <tr><td class="l">問什麼</td><td>十七命（死生・得・娶妻・戰・祟…）</td><td>不限</td></tr>
+  </table></div>
+
+  <div class="card"><h3 style="margin-top:0">怎麼看一張盤</h3>
+  <p><b>一、先認四位。</b>四個三畫卦排成田字。<b>右下是你自己</b>（本人、本方、內裡），左上是對方（外人、客方）；右上是尊（君長、門），左下是卑（部屬、庭院）。同一組位置有四套稱謂——問打仗叫上中下次軍，問家事叫躬身妻妾子姓，問朝廷叫君臣大夫，問居處叫室門宮廷外。介面上可切換。</p>
+  <p><b>二、再認數。</b>十二個筮數裡，<b>六與七只是陰陽的記號</b>（七在簡上寫作「一」），<b class="zhu">四五八九才帶意義</b>，原書稱「惡爻」。實際占筮中六七約佔九成，所以<b>一盤沒有惡爻是常態</b>，不是盤太平淡。惡爻落在哪一位、哪一爻，就是事情的著力點。</p>
+  <p><b>三、然後看判準成立了幾條。</b>三男同女、三左同右、妻夫相見、數出數內、六虛、中心四爻同……每一條都是原書明文，引擎只判位置符不符合，不加自己的話。成立的條目下方附白話。</p>
+  <p><b>四、四季吉凶要挑季節。</b>同一張盤，春夏秋冬判法不同。第一節那套「三吉同兇」「三兇同吉」就靠這個。</p>
+  <p><b>五、爻象與祟只在有惡爻時才出現。</b>爻象是該數所取之物象（八為風為水為飛鳥…），祟是作祟的來源，問「祟」這一命時才列。</p></div>
+
+  <div class="card" style="border-color:var(--zhu)"><h3 style="margin-top:0">三件要先知道的事</h3>
+  <p><b>① 成卦之法竹簡沒寫。</b>引擎提供三式起卦，全是後人重建，介面上每次都會標明。想照原書查驗，用「載入卦例」直接調原書五十七例。</p>
+  <p><b>② 底本不是最善之本。</b>中西書局原書未取得，現用者為集釋、解析與網路整理本。文獻分頁列有完整層級。</p>
+  <p><b>③ 標紅的地方都是有問題的地方。</b>整理者補的字、原書未定的項、諸家異說、本引擎存疑之處，一律標記，不混入正文。</p></div>
+
+  <div class="card"><h3 style="margin-top:0">各分頁做什麼</h3><ul>
+   <li><b>查驗</b>——填盤或起卦，看逐條判斷（附白話）</li>
+   <li><b>卦例</b>——原書五十七例全文，可反查某判準在哪些例中成立</li>
+   <li><b>別卦</b>——同輯《別卦》六十四卦表（附錄，不參與判斷）</li>
+   <li><b>查表</b>——八經卦・四季吉凶・干支・爻象・祟・四位表・十七命</li>
+   <li><b>成卦</b>——各家重建與機率檢定</li>
+   <li><b>文獻</b>——底本層級與校記</li>
+   <li><b>自檢</b>——引擎自我檢查項目</li>
+  </ul></div>`;
+}
+
 /* ── 文獻 ── */
 function paintWenxian(){
   document.getElementById("wenxian").innerHTML=`<h2>文獻</h2>
@@ -950,7 +1154,8 @@ function paintWenxian(){
 <li>爻位類判準（六虛・五虛同一虛・惡爻居之・中心四爻同）已納入回驗，全合。</li>
 <li><b class="zhu">六與七之數，兩家統計本有四筆之差</b>（子居六323/七308；〈術士的占卦秘笈〉六319/七312）。本引擎實算得六323・七308，與子居合。</li>
    <li>「昭穆」無可判之式，標未能通解。</li>
-   <li>「當日・當辰・遂日」須筮日干支，v0.1 未收；且「當日」之義整理者與暮四郎有異說。</li>
+   <li><b>當日・當辰已實作</b>——日干配卦（第二十五節）、日支配卦（第二十七節）、日支配筮數（第二十八節）三層反查，日干支以一九四九年十月一日甲子為單一錨點推算。<span class="zhu">一五八二年以前未作儒略曆修正</span>，且「當日」之義整理者與暮四郎有異說，本引擎取「日干所配之卦見於四位」為判。</li>
+<li>「遂（述）日」諸家無定說，標未能通解，不代擬。</li>
    <li>《別卦》尚未併入（已決定併入本案）。</li>
    <li>五十七例之分節條數為推編，須俟原書核對。</li>
   </ul></div>
@@ -1034,6 +1239,17 @@ function selfCheck(){
   t(45.5,LIE.every(x=>WEI.every(w=>GUA[x.gua[w]])),"所錄卦名皆為八經卦之一");
   const bc=backCheck();
   t(45.6,bc.length>=16&&bc.every(x=>x.ok),`卦例回驗 ${bc.filter(x=>x.ok).length}/${bc.length} 全合`);
+  t(63,dayGZ(1949,10,1).g==="甲"&&dayGZ(1949,10,1).z==="子","日干支錨點：1949-10-01 甲子");
+  t(64,(function(){for(let i=0;i<400;i++){if(dayGZ(2000,1,1+i).i!==dayGZ(2000,1,1+i+60).i)return false;}return true;})(),"六十日循環一致（400 日抽驗）");
+  t(65,guaOfGan("甲")==="乾"&&guaOfGan("癸")==="坤"&&guaOfGan("辛")==="巽","干配卦反查正確");
+  t(66,guaOfZhi("子")==="震"&&guaOfZhi("巳")==="兌"&&!guaOfZhi("　"),"支配卦反查正確（乾坤不與）");
+  t(67,numOfZhi("子")===9&&numOfZhi("寅")===7&&numOfZhi("巳")===4,"支配筮數反查正確（寅為七）");
+  t(68,GAN10.length===10&&ZHI12.length===12,"十干十二支");
+  t(58,["甲","乙","丙"].every(m=>{const r=castAll(m);return WEI.every(w=>r[w].length===3&&r[w].every(n=>NUMS.includes(n)));}),"三式起卦皆出合法十二筮數");
+  t(59,(function(){let c=0;for(let i=0;i<600;i++){const r=castAll("乙");WEI.forEach(w=>r[w].forEach(n=>{if(E.has(n))c++;}));}return c/(600*12)<0.15;})(),"乙式惡爻比例合於實占量級（<15%）");
+  t(60,Object.keys(TRANS).length===6&&TRANS[8][9]&&!TRANS[8][7],"變化表：八變六或九，不變七（原表如此）");
+  t(61,WEID.length===4&&WEID[0]==="右下"&&WEID[3]==="左上","輸出序自內而外（右下→右上→左下→左上）");
+  t(62,Object.keys(BAI_RULE).length>=14&&Object.keys(BAI_WEI).length===4,"白譯：四位四條、判準十四條以上");
   t(51,Object.keys(BIE).length===8&&BIE_UP.length===8,"別卦八經卦俱全");
   t(52,BIE_UP.every(u=>Object.keys(BIE[u]).length===8),"每經卦八個下卦，合六十四");
   t(53,BIE_UP.every(u=>{const q=bieSeq(u);return q[0]===u&&q.length===8&&new Set(q).size===8;}),"組內序：經卦居首，八卦不重複");
@@ -1054,16 +1270,31 @@ function selfCheck(){
 document.getElementById("ming").innerHTML=MING.map(m=>`<option${m==="得"?" selected":""}>${m}</option>`).join("");
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.setAttribute("aria-selected",x===b));
-  ["t1","t2","t7","t3","t4","t5","t6"].forEach(id=>document.getElementById(id).hidden=(id!==b.dataset.t));
+  ["t0","t1","t2","t7","t3","t4","t5","t6"].forEach(id=>document.getElementById(id).hidden=(id!==b.dataset.t));
 });
 document.getElementById("reg").addEventListener("change",paintGrid);
 document.getElementById("run").onclick=run;
 document.getElementById("demo").onclick=()=>{
-  // 第一節〈死生〉第五組之左下為兌（含五、九），其餘位以常爻補足 — 示例，非原卦例
-  Object.assign(state,{"左上":[6,7,6],"右上":[7,6,6],"左下":[5,9,6],"右下":[6,7,6]});
+  const i=Math.floor(Math.random()*LIE.length), x=LIE[i];
+  WEI.forEach(w=>state[w]=x.yao[w].slice());
   buildGrid();run();
+  document.getElementById("out").insertAdjacentHTML("afterbegin",
+   `<div class="card" style="border-color:var(--qing)"><b>已載入原書卦例 №${x.id}　第${x.jie}節 ${x.name}</b>
+    <br><small>筮辭：${x.ci}</small></div>`);
 };
-buildGrid();paintTables();paintChengua();paintLie();paintBack();paintBie();paintWenxian();selfCheck();run();
+document.getElementById("cast").onclick=()=>{
+  const mode=document.getElementById("cmode").value;
+  let r; try{ r=castAll(mode); }catch(e){ alert("起卦失敗："+e.message); return; }
+  WEI.forEach(w=>state[w]=r[w]);
+  buildGrid();run();
+  const nm={"甲":"楚簡實占分布","乙":"卦例分布（含爻位）","丙":"五十五策五變"}[mode];
+  document.getElementById("out").insertAdjacentHTML("afterbegin",
+   `<div class="card" style="border-color:var(--zhu)"><b>已起卦　${mode}・${nm}</b>
+    <br><small><b class="zhu">《筮法》未載成卦之法，此為後人重建，非經文所有。</b>
+    亂數取自 crypto.getRandomValues 並以拒絕取樣去除模數偏差。
+    右卦（之卦）依五十七卦例所實測之變化關係推出。詳見「成卦」分頁。</small></div>`);
+};
+buildGrid();paintTables();paintChengua();paintNav();paintLie();paintBack();paintBie();paintWenxian();selfCheck();run();
 </script>
 </body>
 </html>
